@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+	<style type="text/css">
+		:root {
+			/* replace 'img_url' with your animated image or regular image link */
+			--url: url("");
+		}
+
+		html,
+		body {
+			background-color: #00000000;
+			width: 100%;
+			height: 100%;
+			margin: 0;
+			padding: 0;
+			overflow: hidden;
+			font-family: JetBrains Mono, Consolas, 'Courier New', monospace;
+			color: white;
+		}
+
+		.margin:first-child {
+			background-image: var(--url);
+			background-size: cover;
+			background-repeat: no-repeat;
+			background-attachment: fixed;
+		}
+
+		.lines-content:nth-of-type(1),
+		.monaco-editor-background:nth-of-type(1) {
+			background-image: var(--url);
+			background-size: cover;
+			background-repeat: no-repeat;
+			background-attachment: fixed;
+		}
+	</style>
+	<meta charset="utf-8" />
+	<title></title>
+</head>
+
+<body>
+	<div id="container" style="width:100%;height:100%;"></div>
+	<script src="vs/loader.js"></script>
+	<script type="text/javascript">
+		require.config({
+			paths: {
+				'vs': 'vs',
+			}
+		});
+
+		// API
+		var GetText;
+		var SetText;
+		var SetTheme;
+		var SetScroll;
+		var ShowErr;
+		var Refresh;
+
+		// Enablers
+		var SwitchMinimap;
+		var SwitchReadonly;
+		var SwitchRenderWhitespace;
+		var SwitchLinks;
+		var SwitchLineHeight;
+		var SwitchFontSize;
+		var SwitchFolding;
+		var SwitchAutoIndent;
+		var SwitchFontFamily;
+		var SwitchFontLigatures;
+		var AddIntellisense;
+
+		// Variables
+		var editor;
+		var Proposals = [];
+
+		require(['vs/editor/editor.main'], function () {
+			function getDependencyProposals() {
+				let newProposals = [];
+				for (let index = 0; index < Proposals.length; index++) {
+					const element = Proposals[index];
+					let newElement = {}
+					for (const key in element) {
+						if (key == "__children__") {
+							continue;
+						};
+						newElement[key] = element[key];
+					}
+					newProposals.push(newElement)
+				}
+				return newProposals;
+			}
+
+			monaco.editor.defineTheme('net-theme-light', {
+				base: 'vs',
+				inherit: true,
+				rules: [
+					{ token: 'global', foreground: '000000' },
+					{ token: 'keyword', foreground: 'ff6a00' },
+					{ token: 'comment', foreground: '666666' },
+					{ token: 'number', foreground: 'ffc600' },
+					{ token: 'string', foreground: 'ff8c3a' },
+				]
+			});
+
+			monaco.editor.defineTheme('net-theme-dark', {
+				base: 'vs-dark',
+				inherit: true,
+				rules: [
+					{ token: 'global', foreground: 'FFFFFF', fontStyle: "bold" },
+					{ token: 'keyword', foreground: 'ff6a00', fontStyle: "bold" },
+					{ token: 'comment', foreground: '666666' },
+					{ token: 'number', foreground: 'ffc600' },
+					{ token: 'string', foreground: 'ff8c3a' },
+				]
+			});
+
+			monaco.editor.defineTheme('Fusion', {
+				base: 'vs-dark',
+				inherit: true,
+				rules: [
+					{ token: '', foreground: '#E0E0F5' },
+					{ token: 'variable.language.self', foreground: '#6699FF' },
+					{ token: 'variable.parameter.variadic', foreground: '#6699FF' },
+					{ token: 'variable.parameter.function', foreground: '#B8A3FF' },
+					{ token: 'variable.other.constant', foreground: '#6699FF' },
+					{ token: 'variable.property', foreground: '#5CB8FF' },
+					{ token: 'variable.object.property', foreground: '#55E6D4' },
+			
+					{ token: 'keyword', foreground: '#9B84FF' },
+					{ token: 'keyword.local', foreground: '#836EFF' },
+					{ token: 'keyword.operator', foreground: '#75D6FF' },
+					{ token: 'keyword.operator.type.annotation', foreground: '#A5B2FF' },
+					{ token: 'keyword.operator.typedef.annotation', foreground: '#75D6FF' },
+					{ token: 'keyword.control.export', foreground: '#836EFF', fontStyle: 'italic' },
+			
+					{ token: 'operator', foreground: '#75D6FF' },
+					{ token: 'operator.type', foreground: '#9B84FF' },
+					{ token: 'operator.special', foreground: '#9B84FF' },
+			
+					{ token: 'entity.name.type.alias', foreground: '#5CB8FF' },
+					{ token: 'entity.name.function', foreground: '#75D6FF' },
+			
+					{ token: 'global', foreground: '#75D6FF' },
+			
+					{ token: 'storage.type', foreground: '#9B84FF' },
+			
+					{ token: 'comment', foreground: '#8C8C8C', fontStyle: 'italic' },
+					{ token: 'comment.highlight.title', foreground: '#75D6FF', fontStyle: 'italic' },
+					{ token: 'comment.highlight.name', foreground: '#75D6FF', fontStyle: 'italic' },
+					{ token: 'comment.delimiter.modifier', foreground: '#A5B2FF', fontStyle: 'italic' },
+					{ token: 'comment.highlight.modifier', foreground: '#5CB8FF', fontStyle: 'italic' },
+					{ token: 'comment.highlight.descriptor', foreground: '#6699FF', fontStyle: 'italic' },
+			
+					{ token: 'delimiter.longstring', foreground: '#75D6FF' },
+					{ token: 'delimiter.bracket', foreground: '#C3C6CF' },
+					{ token: 'delimiter.array', foreground: '#C3C6CF' },
+					{ token: 'delimiter.parenthesis', foreground: '#C3C6CF' },
+					{ token: 'delimiter', foreground: '#C3C6CF' },
+			
+					{ token: 'string', foreground: '#B2F2A6' },
+					{ token: 'longstring', foreground: '#B2F2A6' },
+					{ token: 'string.delimeter', foreground: '#75D6FF' },
+					{ token: 'string.escape', foreground: '#75D6FF' },
+			
+					{ token: 'punctuation.separator.arguments', foreground: '#A5B2FF' },
+					{ token: 'punctuation.separator.parameter', foreground: '#75D6FF' },
+					{ token: 'punctuation.separator.table', foreground: '#75D6FF' },
+					{ token: 'punctuation.definition.block', foreground: '#A5B2FF' },
+					{ token: 'punctuation.definition.parameters', foreground: '#A5B2FF' },
+					{ token: 'punctuation.definition.typeparameters', foreground: '#75D6FF' },
+			
+					{ token: 'constant.language', foreground: '#6699FF' },
+					{ token: 'number', foreground: '#6699FF' },
+					{ token: 'constants', foreground: '#6699FF' },
+			
+					{ token: 'support.function', foreground: '#4EC4FF' },
+					{ token: 'support.function.library', foreground: '#4EC4FF' },
+					{ token: 'support.type', foreground: '#5CB8FF' },
+				],
+				colors: {
+					'editor.background': '#00000000',
+					'minimap.background': '#0C0C0C',
+			
+					'editorLineNumber.foreground': '#8C8C8C',
+					'editorLineNumber.activeForeground': '#CCCCCC',
+			
+					'editorIndentGuide.background': '#2A2A2A',
+			
+					'editorSuggestWidget.background': "#202020",
+					'editorSuggestWidget.border': "#2A2A2A",
+					'editorSuggestWidget.foreground': "#E0E0E0",
+					'editorSuggestWidget.selectedBackground': "#505050",
+					'editorSuggestWidget.highlightForeground': "#4EC4FF",
+			
+					'textCodeBlock.background': '#202020',
+				}
+			});							
+
+			require(['vs/basic-languages/monaco.contribution'], function () {
+				monaco.languages.registerCompletionItemProvider('lua', {
+					provideCompletionItems: function (model, position) {
+						return {
+							suggestions: getDependencyProposals(),
+						};
+					},
+					triggerCharacters: ['.', ':', '"'],
+				});
+
+				editor = monaco.editor.create(document.getElementById('container'), {
+					value: '',
+					language: 'lua',
+					theme: "Fusion",
+					fontSize: "14px",
+					fontFamily: "'Consolas', JetBrains Mono, 'Courier New', monospace",
+					folding: true,
+					dragAndDrop: true,
+					links: true,
+					minimap: {
+						enabled: true,
+					},
+					showFoldingControls: "always",
+					smoothScrolling: true,
+					stopRenderingLineAfter: 6500,
+					cursorBlinking: "smooth",
+					cursorSmoothCaretAnimation: true,
+					foldingHighlight: false,
+					fontLigatures: true,
+					formatOnPaste: true,
+					showDeprecated: true,
+					suggest: {
+						snippetsPreventQuickSuggestions: false,
+					},
+					padding: {
+						top: 0,
+					}
+				});
+
+				function addAction(id, label, run, keybinds) {
+            editor.addAction({
+                id: id,
+                label: label,
+                precondition: null,
+                keybindings: keybinds,
+                keybindingContext: null,
+                contextMenuGroupId: 'navigation',
+                contextMenuOrder: 1.5,
+                run: function() {
+                    run()
+                    return null;
+                }
+            });
+        }
+
+        addAction('clear-editor', "Clear", function() {
+            editor.setValue("");
+        });
+        addAction('refresh', "Refresh", function() {
+            var replaceValue = editor.getValue()
+            editor.setValue(replaceValue);
+            replaceValue = null
+        }, [monaco.KeyMod.chord(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KEY_R)]);
+
+        window.onresize = function() {
+            editor.layout();
+        }
+	
+
+				try {
+				if (CefSharp) {
+					editor.onKeyDown(function(e) {
+						// console.log()
+						if (!(e.altKey || e.ctrlKey || e.shiftKey || e.metaKey)) {
+							if (e.key !== 'Backspace' || editor.getValue() !== '')
+							CefSharp.PostMessage('keydown')
+						}
+					})
+				} } catch { }
+
+				editor.getModel().updateOptions({ insertSpaces: false })
+			});
+
+			window.onresize = function () {
+				editor.layout();
+			}
+
+			Cut = function() {
+				editor.focus();
+				document.execCommand('cut');
+			}
+
+			Copy = function() {
+				editor.focus();
+				document.execCommand('copy');
+			}
+
+			Paste = function() {
+				editor.focus();
+				document.execCommand('paste');
+			}
+
+			Undo = function() {
+				editor.focus();
+				document.execCommand('undo');
+			}
+
+			Redo = function() {
+				editor.focus();
+				document.execCommand('redo');
+			}
+
+			Delete = function() {
+				editor.focus();
+				document.execCommand('delete');
+			}
+
+			SelectAll = function() {
+				editor.focus();
+				document.execCommand('selectAll');
+			}
+
+			GetText = function () {
+				return String(editor.getValue());
+			}
+
+			SetText = function (x) {
+				try {
+					editor.setValue(JSON.parse(`${String(x)}`));
+				} catch (e) {
+					editor.setValue(String(x))
+				}
+			}
+
+			GetProposals = function () {
+				return Proposals;
+			}
+
+
+			OnDidChangeContent = function (callback) {
+				return editor.onDidChangeModelContent((event) => {
+					callback(editor.getValue());
+				});
+			}
+
+			OnDidChangeCursorPosition = function (callback) {
+				return editor.onDidChangeCursorPosition((event) => {
+					callback(event.position);
+				});
+			}
+
+			SetTheme = function (themeName) {
+				if (themeName == 'PDark') {
+					monaco.editor.setTheme('PDark')
+				}
+				if (themeName == "Dark") {
+					monaco.editor.setTheme("net-theme-dark");
+				}
+				if (themeName == "Light") {
+					monaco.editor.setTheme("net-theme-light");
+				}
+			}
+
+			SwitchMinimap = function (flag) {
+				editor.updateOptions({
+					minimap: {
+						enabled: flag,
+					}
+				});
+			}
+
+			SwitchReadonly = function (flag) {
+				editor.updateOptions({
+					readOnly: flag,
+				});
+			}
+
+			SwitchRenderWhitespace = function (op) {
+				editor.updateOptions({
+					renderWhitespace: op,
+				});
+			}
+
+			SwitchLinks = function (flag) {
+				editor.updateOptions({
+					links: flag,
+				});
+			}
+
+			SwitchLineHeight = function (num) {
+				editor.updateOptions({
+					lineHeight: num,
+				});
+			}
+
+			SwitchFontSize = function (num) {
+				editor.updateOptions({
+					fontSize: num,
+				});
+			}
+
+			SwitchFolding = function (flag) {
+				editor.updateOptions({
+					folding: flag,
+				});
+			}
+
+			SwitchAutoIndent = function (flag) {
+				editor.updateOptions({
+					autoIndent: flag,
+				});
+			}
+
+			SwitchFontFamily = function (name) {
+				editor.updateOptions({
+					fontFamily: name,
+				});
+			}
+
+			SwitchFontLigatures = function (flag) {
+				editor.updateOptions({
+					fontLigatures: flag,
+				});
+			}
+
+			ShowErr = function (line, column, endline, endcolumn, errMessage) {
+				editor.revealPositionInCenter({ lineNumber: line, column: column });
+				editor.deltaDecorations([], [
+					{
+						range: new monaco.Range(line, column, endline, endcolumn),
+						options: {
+							inlineClassName: 'squiggly-error',
+							hoverMessage: {
+								value: errMessage,
+							}
+						},
+					},
+				]);
+			}
+
+			AddSnippet = function (kindName, snippetName, data) {
+				let snippet = {
+					insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+					kind: monaco.languages.CompletionItemKind[kindName],
+				};
+				for (const key in data) {
+					let value = data[key];
+					if (key == "insertText" && typeof value == "object") {
+						value = value.join("\n");
+					};
+					snippet[key] = value;
+				}
+				if (!snippet.label) {
+					snippet.label = snippetName
+				}
+				if (!snippet.insertText) {
+					snippet.insertText = snippetName
+				}
+				Proposals.push(snippet);
+			}
+
+			AddRawSnippet = function (data) {
+				Proposals.push(data);
+			}
+
+			SetScroll = function (line) {
+				editor.revealLineInCenter({ lineNumber: line });
+			}
+
+			Refresh = function () {
+				var text = getText();
+				setText("");
+				editor.trigger('keyboard', 'type', { text: text });
+			}
+
+		});
+	</script>
+</body>
+</html>
